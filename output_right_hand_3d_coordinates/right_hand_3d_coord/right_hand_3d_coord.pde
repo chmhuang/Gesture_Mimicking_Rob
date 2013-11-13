@@ -85,6 +85,30 @@ void draw()
       text(Integer.toString(userList[i]), com2d.x, com2d.y);
     }
   }
+  
+  // Shoulder Rotation Angle
+  if (userList.length > 0) {
+    if (context.isTrackingSkeleton(userList[0])) {
+      print("Shoulder angle ");
+      println(shoulderAngle(userList[0]));
+    }
+  }
+}
+
+//Shoulder Rotation Angle
+float shoulderAngle(int userId) {
+  PVector rightHandPos = new PVector();
+  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_HAND, rightHandPos);
+  PVector rightShoulderPos = new PVector();
+  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, rightShoulderPos);
+  
+  float rightArmY = rightShoulderPos.y - rightHandPos.y;
+  float rightArmZ = rightShoulderPos.z - rightHandPos.z;
+  print(rightArmZ);
+  print(" ");
+  println(rightArmY);
+  float rightShoulderAngle = atan2(rightArmZ, rightArmY);
+  return rightShoulderAngle;
 }
 
 // draw the skeleton with the selected joints
@@ -99,6 +123,9 @@ void drawSkeleton(int userId)
   context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_HAND, jointPos);
   PVector jointPos_Proj = new PVector(); 
   context.convertRealWorldToProjective(jointPos, jointPos_Proj);
+  print("RealWorld ");
+  println(jointPos);
+  print("Projected ");
   println(jointPos_Proj  );
   println("Joint Pos End");
 
