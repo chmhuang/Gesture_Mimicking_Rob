@@ -128,8 +128,23 @@ void drawSkeleton(int userId)
   print("Projected ");
   println(jointPos_Proj  );
   println("Joint Pos End");
-
-
+  /* Angle Calculation. */
+  // Right Arm Vectors
+  PVector rHand = new PVector();
+  PVector rElbow = new PVector();
+  PVector rShoulder = new PVector();
+  float[] angles = new float[9];
+  // Right Arm
+  context.getJointPositionSkeleton(1, SimpleOpenNI.SKEL_RIGHT_HAND, rHand);
+  context.getJointPositionSkeleton(1, SimpleOpenNI.SKEL_RIGHT_ELBOW, rElbow);
+  context.getJointPositionSkeleton(1, SimpleOpenNI.SKEL_RIGHT_SHOULDER, rShoulder);
+  context.convertRealWorldToProjective(rHand, rHand);
+  context.convertRealWorldToProjective(rElbow, rElbow);
+  context.convertRealWorldToProjective(rShoulder, rShoulder);
+  angles[5] = angle(rHand, rElbow, rShoulder);
+  
+  println("angle 5 " + angles[5]);
+  
   context.drawLimb(userId, SimpleOpenNI.SKEL_HEAD, SimpleOpenNI.SKEL_NECK);
   context.drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_LEFT_SHOULDER);
   context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_LEFT_ELBOW);
@@ -150,6 +165,15 @@ void drawSkeleton(int userId)
   context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_HIP, SimpleOpenNI.SKEL_RIGHT_KNEE);
   context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);
 }
+float angle(PVector a, PVector b, PVector c) {
+  float angle01 = atan2(a.y - b.y, a.x - b.x);
+  float angle02 = atan2(b.y - c.y, b.x - c.x);
+  float ang = angle02 - angle01;
+  return ang;
+}
+
+
+
 
 // -----------------------------------------------------------------
 // SimpleOpenNI events
