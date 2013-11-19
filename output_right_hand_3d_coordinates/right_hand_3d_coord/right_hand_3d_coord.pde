@@ -10,7 +10,8 @@
  */
 
 import SimpleOpenNI.*;
-
+import processing.serial.*;
+Serial myPort;
 SimpleOpenNI  context;
 color[]       userClr = new color[] { 
   color(255, 0, 0), 
@@ -26,7 +27,9 @@ PVector com2d = new PVector();
 void setup()
 {
   size(640, 480);
-
+  String portName = Serial.list()[0];
+  println(Serial.list());
+  myPort = new Serial(this, portName, 115200);
   context = new SimpleOpenNI(this);
   if (context.isInit() == false)
   {
@@ -90,7 +93,10 @@ void draw()
   if (userList.length > 0) {
     if (context.isTrackingSkeleton(userList[0])) {
       print("Shoulder angle ");
+      
       println(shoulderAngle(userList[0]));
+      //myPort.write((int)shoulderAngle(userList[0]));
+      myPort.write('1');
     }
   }
 }
