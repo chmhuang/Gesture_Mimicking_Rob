@@ -35,8 +35,15 @@ void setup() {
 
 void loop() {
   if (Serial.available() > 0) {
+    motor.id = 1;
     int reading = Serial.read();
-    motor.setVel (300);
+    motor.setVel (150);
+    motor.setPos (reading * 100);
+  }
+  if (Serial.available() > 0) {
+    motor.id = 4;
+    int reading = Serial.read();
+    motor.setVel (150);
     motor.setPos (reading * 100);
   }
 /*
