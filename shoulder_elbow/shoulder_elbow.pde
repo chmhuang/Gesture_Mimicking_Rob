@@ -99,13 +99,41 @@ void draw()
       //        myPort.write('1');
       //      } else if (shoulderAngle(userList[0]) < -1) {
       //        myPort.write('0');
-      //      }
+      //      }   
+      // elbow
+      PVector jointPos = new PVector();
+      println("Joint Pos Start");
+      print("user id ");
+      println(userId );
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_HAND, jointPos);
+      PVector jointPos_Proj = new PVector(); 
+      context.convertRealWorldToProjective(jointPos, jointPos_Proj);
+      print("RealWorld ");
+      println(jointPos);
+      print("Projected ");
+      println(jointPos_Proj  );
+      println("Joint Pos End");
+      /* Angle Calculation. */
+      // Right Arm Vectors
+      PVector rHand = new PVector();
+      PVector rElbow = new PVector();
+      PVector rShoulder = new PVector();
+      float[] angles = new float[9];
+      // Right Arm
+      context.getJointPositionSkeleton(1, SimpleOpenNI.SKEL_RIGHT_HAND, rHand);
+      context.getJointPositionSkeleton(1, SimpleOpenNI.SKEL_RIGHT_ELBOW, rElbow);
+      context.getJointPositionSkeleton(1, SimpleOpenNI.SKEL_RIGHT_SHOULDER, rShoulder);
+      context.convertRealWorldToProjective(rHand, rHand);
+      context.convertRealWorldToProjective(rElbow, rElbow);
+      context.convertRealWorldToProjective(rShoulder, rShoulder);
+      angles[5] = angle(rHand, rElbow, rShoulder);
+      // output
       println("Arduino Value");
       // sendValue1 is shoulder 
       int sendValue1 = (((int) (500 + shoulderAngle(userList[0]) / (3.14/2) * 300) / 100) + 8) % 8 + 1;
       println(sendValue1);
       myPort.write(sendValue1);
-      int sendValue2 = toAx12(angle[5]);
+      int sendValue2 = toAx12(elbowAngle(userList[0]));
       //delay(100);
     }
   }
@@ -128,6 +156,25 @@ float shoulderAngle(int userId) {
   println(rightArmY);
   float rightShoulderAngle = atan2(rightArmZ, rightArmY);
   return rightShoulderAngle;
+}
+//Elbow Rotation Angle
+float elbowAngle(int userId) {  
+  PVector jointPos = new PVector();
+  PVector jointPos_Proj = new PVector(); 
+  context.convertRealWorldToProjective(jointPos, jointPos_Proj);
+  /* Angle Calculation. */
+  // Right Arm Vectors
+  PVector rHand = new PVector();
+  PVector rElbow = new PVector();
+  PVector rShoulder = new PVector();
+  // Right Arm
+  context.getJointPositionSkeleton(1, SimpleOpenNI.SKEL_RIGHT_HAND, rHand);
+  context.getJointPositionSkeleton(1, SimpleOpenNI.SKEL_RIGHT_ELBOW, rElbow);
+  context.getJointPositionSkeleton(1, SimpleOpenNI.SKEL_RIGHT_SHOULDER, rShoulder);
+  context.convertRealWorldToProjective(rHand, rHand);
+  context.convertRealWorldToProjective(rElbow, rElbow);
+  context.convertRealWorldToProjective(rShoulder, rShoulder);
+  return angle(rHand, rElbow, rShoulder);
 }
 
 // draw the skeleton with the selected joints
