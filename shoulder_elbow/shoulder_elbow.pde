@@ -22,8 +22,8 @@ PVector com2d = new PVector();
 
 void setup() {
   size(640, 480);
-  //String portName = Serial.list()[0];
-  //myPort = new Serial(this, portName, 9600);
+  String portName = Serial.list()[0];
+  myPort = new Serial(this, portName, 9600);
   context = new SimpleOpenNI(this);
   if (context.isInit() == false) {
     println("Can't init SimpleOpenNI, maybe the camera is not connected!"); 
@@ -95,11 +95,10 @@ void draw() {
       //println("shoulder angle " + filteredShoulder);
       //println("shoulder flap " + filteredShoulderFlap);
       //println("elbow " + filteredElbow);
-      //myPort.write(toAx12(filteredShoulder));
+      myPort.write(toAx12(filteredShoulder));
       println(toAx12(filteredShoulder));
-      //myPort.write(toAx12(filteredShoulderFlap));
+      myPort.write(toAx12(filteredShoulderFlap));
       println(toAx12(filteredShoulderFlap));
-      //myPort.write("elbow angle " + sendValue2);
       //delay(100);
     }
   }
