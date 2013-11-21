@@ -34,18 +34,29 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.available() > 0) {
+  while(!Serial.available()) {
+  }
+  char packet[5];
+  Serial.readBytesUntil('\n', packet, 5);
     motor.id = 1;
-    int reading = Serial.read();
+    char reading = packet[0];
     motor.setVel (150);
     motor.setPos (reading * 100);
-  }
-  if (Serial.available() > 0) {
-    motor.id = 4;
-    int reading = Serial.read();
+    /*
+    motor.id = 2;
+    reading = packet[1];
     motor.setVel (150);
     motor.setPos (reading * 100);
-  }
+    */
+    motor.id = 2;
+    motor.setPos(800);
+    motor.id = 3; 
+    motor.setPos (500);
+    motor.id = 4; 
+    motor.setPos (500);
+    motor.id = 5; 
+    motor.setPos (500);
+
 /*
     if (Serial.available() > 0) {
       int tmp = Serial.read() - 48;
