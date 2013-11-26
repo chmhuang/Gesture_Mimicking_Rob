@@ -34,19 +34,43 @@ void setup() {
   // enable depthMap generation 
   context.enableDepth();
 
-  // enable skeleton generation for all joints
+  // enable skeleton generation for all joints.
   context.enableUser();
   background(200, 0, 0);
   stroke(0, 0, 255);
   strokeWeight(3);
   smooth();
 }
-  float oldShoulder = 0;
-  float oldShoulderFlap = 0;
-  float oldElbow = 0;
-  float filteredShoulder = 0;
-  float filteredShoulderFlap = 0;
-  float filteredElbow = 0;
+  PVector oldRShoulder = new PVector();
+  PVector oldRElbow = new PVector();
+  PVector oldRHand = new PVector();
+  PVector oldRHip = new PVector();
+  PVector oldRKnee = new PVector();
+  PVector oldRFoot = new PVector();
+  PVector oldLShoulder = new PVector();
+  PVector oldLElbow = new PVector();
+  PVector oldLHand = new PVector();
+  PVector oldLHip = new PVector();
+  PVector oldLKnee = new PVector();
+  PVector oldLFoot = new PVector();  
+  PVector oldTorso = new PVector();
+  PVector oldNeck = new PVector();
+  
+  PVector filteredRShoulder = new PVector();
+  PVector filteredRElbow = new PVector();
+  PVector filteredRHand = new PVector();
+  PVector filteredRHip = new PVector();
+  PVector filteredRKnee = new PVector();
+  PVector filteredRFoot = new PVector();
+  PVector filteredLShoulder = new PVector();
+  PVector filteredLElbow = new PVector();
+  PVector filteredLHand = new PVector();
+  PVector filteredLHip = new PVector();
+  PVector filteredLKnee = new PVector();
+  PVector filteredLFoot = new PVector();  
+  PVector filteredTorso = new PVector();
+  PVector filteredNeck = new PVector();
+  
 void draw() {
   // update the cam
   context.update();
@@ -80,35 +104,77 @@ void draw() {
   if (userList.length > 0) {
     if (context.isTrackingSkeleton(userList[0])) {
       // output, right now only send values by the 100
-      println("Arduino Value");
-      // sendValue1 is shoulder 
-      float shoulder = shoulderAngle(userList[0]);
-      float shoulderFlap = shoulderFlapAngle(userList[0]);
-      float elbow = elbowAngle(userList[0]);
-      filteredShoulder = 0.99 * oldShoulder + 0.01 * shoulder;
-      filteredShoulderFlap = 0.99 * oldShoulderFlap + 0.01 * shoulderFlap;
-      filteredElbow = 0.99 * oldElbow + 0.01 * elbow;
-      oldShoulder = shoulder;
-      oldShoulderFlap = shoulderFlap;
-      oldElbow = elbow;
-      //println("shoulder angle " + filteredShoulder);
-      //println("shoulder flap " + filteredShoulderFlap);
-      //println("elbow " + filteredElbow);
-      //flapDotProduct(userList[0]);
-      myPort.write(toAx12(filteredShoulder));
-      println(toAx12(filteredShoulder));
+      PVector rElbow = new PVector();
+      PVector rShoulder = new PVector();
+      PVector rHand = new PVector();
+      PVector rHip = new PVector();
+      PVector rKnee = new PVector();
+      PVector rFoot = new PVector();
+      PVector lElbow = new PVector();
+      PVector lShoulder = new PVector();
+      PVector lHand = new PVector();
+      PVector lHip = new PVector();
+      PVector lKnee = new PVector();
+      PVector lFoot = new PVector();
+      PVector torso = new PVector();
+      PVector neck = new PVector();
+      int userId = userList[0];
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, rElbow);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, rShoulder);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_HAND, rHand);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_HIP, rHip);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, rKnee);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_FOOT, rFoot);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, lElbow);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, lShoulder);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_HAND, lHand);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_HIP, lHip);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_KNEE, lKnee);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_FOOT, lFoot);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_TORSO, torso);
+      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_NECK, neck);
+      
+      float alpha = 0.99;
+      float beta = 1 - alpha;
+      filteredRShoulder = new PVector(alpha * oldRShoulder.x + beta * rShoulder.x,
+                           alpha * oldRShoulder.y + beta * rShoulder.y, 
+                           alpha * oldRShoulder.z + beta * rShoulder.z);
+      filteredRElbow = new PVector(alpha * oldRElbow.x + beta * rElbow.x,
+                           alpha * oldRElbow.y + beta * rElbow.y, 
+                           alpha * oldRElbow.z + beta * rElbow.z);
+      filteredRHand = new PVector(alpha * oldRHand.x + beta * rHand.x,
+                           alpha * oldRHand.y + beta * rHand.y, 
+                           alpha * oldRHand.z + beta * rHand.z);
+ 
+      oldRShoulder = rShoulder;
+      oldRElbow = rElbow;
+      oldRHand = rHand;
+      float shoulderAng = shoulderFromDotProduct(filteredRElbow, filteredRShoulder, filteredRHand);
+      float shoulderFlapAng = shoulderFlapFromDotProduct(filteredRElbow, filteredRShoulder);
+      float elbowAng = elbowFromDotProduct(filteredRElbow, filteredRShoulder, filteredRHand);
+     // println("shoulderAng " + shoulderAng);
+     // println("shoulderFlapAng " + shoulderFlapAng);
+      println(toAx12Old(shoulderAng));
+      println(toAx12Old(shoulderFlapAng));
+      println(toAx12Old(elbowAng));
+      myPort.write(toAx12Old(shoulderAng));
+      myPort.write(toAx12Old(shoulderFlapAng));
+      myPort.write(toAx12Old(elbowAng));
+      //println(toAx12(shoulderAng));
       //myPort.write(toAx12(filteredShoulderFlap));
-      println(toAx12(filteredShoulderFlap));
+    //  println(toAx12(filteredShoulderFlap));
       myPort.write('\n');
       //delay(100);
     }
   }
 }
 /** Helper to convert angle into Ax12 input. */
-int toAx12(float inp) {
-  return ((int) (500 + inp / (3.14/2) * 300) / 10) + 1;
+int toAx12Old(float inp) {
+  return ((int) (200 + inp / (3.14/2) * 300) / 10);
 }
-
+int toAx12(float inp) {
+  return ((int) (inp/3.14 * 600) + 200);
+}
 // draw the skeleton with the selected joints
 void drawSkeleton(int userId) {
   print("user id ");
@@ -169,11 +235,7 @@ void keyPressed() {
 }
 
 //Shoulder YZ Plane Angle
-float shoulderAngle(int userId) {
-  PVector elbowVec = new PVector();
-  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, elbowVec);
-  PVector shoulderVec = new PVector();
-  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, shoulderVec);
+float shoulderAngle(PVector elbowVec, PVector shoulderVec) {
   int[] elbow = {(int) elbowVec.x, (int) elbowVec.y, (int) elbowVec.z};
   int[] shoulder = {(int) shoulderVec.x, (int) shoulderVec.y, (int) shoulderVec.z};
   int rightArmY = shoulder[1] - elbow[1];
@@ -235,4 +297,58 @@ float elbowAngle(int userId) {
   float rightElbowAngle = atan2(rightArmZ, rightArmY);
   //println("Elbow " + rightElbowAngle);
   return rightElbowAngle;
+}
+
+float shoulderFromDotProduct(PVector elbow, PVector shoulder, PVector hand) {
+  
+ 
+  PVector arm = new PVector(0, elbow.y-shoulder.y, elbow.z-shoulder.z);
+  PVector side = new PVector(0, 0, 1);
+  // find projection
+  float dp = arm.dot(side);
+  float ang = acos(dp / (arm.mag()*side.mag()));
+  //println("shoulderAng = " + ang);
+  
+  println("magnitude of bicep vector" + arm.mag());
+  float arm_mag = arm.mag();
+ if (arm_mag < thresh) {
+   arm = new PVector(0, hand.y-shoulder.y, hand.z-shoulder.z);
+   float arm_hand_mag = arm.mag();
+   if (arm_hand_mag < thresh) {
+     return (3.14/2);
+   } else {
+     ang = vec2angle(arm, side);
+     return ang;
+   }
+ } else {
+  return ang;
+}
+}
+
+float thresh = 150;
+float vec2angle(PVector v, PVector ref) {
+  float dp = v.dot(ref);
+  float ang = acos(dp/(v.mag()*ref.mag()));
+  return ang;
+}
+
+float shoulderFlapFromDotProduct(PVector elbow, PVector shoulder) {
+  PVector arm = new PVector(elbow.x-shoulder.x, elbow.y-shoulder.y, 0);
+  PVector ref = new PVector(0, 1, 0);
+  float ang = vec2angle(arm, ref);
+  //println("shoulder flap ang = " + ang);
+  float arm_mag = arm.mag();
+  if (arm_mag < thresh) {
+    return 3.14;
+  } else {
+  return ang;
+  }
+}
+
+float elbowFromDotProduct(PVector elbow, PVector shoulder, PVector hand) {
+  PVector forarm = new PVector(hand.x - elbow.x, hand.y - elbow.y, hand.z - elbow.z);
+  PVector bicep = new PVector(shoulder.x - elbow.x, shoulder.y - elbow.y, shoulder.z - elbow.z);
+  float ang = vec2angle(forarm, bicep);
+  
+  return (3.14-ang);
 }
