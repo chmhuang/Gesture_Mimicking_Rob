@@ -7,9 +7,9 @@
 
 import SimpleOpenNI.*;
 import processing.serial.*;
-Serial myPort;
-SimpleOpenNI  context;
-color[]       userClr = new color[] { 
+
+/********** Drawing Window **********/
+final color[] userClr = new color[] { 
   color(255, 0, 0), 
   color(0, 200, 200), 
   color(0, 0, 255), 
@@ -17,67 +17,93 @@ color[]       userClr = new color[] {
   color(255, 0, 255), 
   color(0, 255, 255)
 };
+
+/********** Kinect **********/
+SimpleOpenNI  context;
+int[] skeletonIndexes;
+PVector[] filteredSkeleton;
+final float lowPassAlpha = .99;
+final float lowPassBeta = 1 - lowPassAlpha;
+  
+/********** Arduino **********/
+// Assumed to be the first Serial port in Serial.list()
+boolean isArduinoConnected;
+Serial arduinoSerialPort;
+
 PVector com = new PVector();                                   
 PVector com2d = new PVector();                                   
 
+/********** setup() **********/
 void setup() {
-  size(640, 480);
-  String portName = Serial.list()[0];
-  myPort = new Serial(this, portName, 9600);
+  // Set up Arduino
+  isArduinoConnected = Serial.list().length > 0;
+  if (isArduinoConnected) {
+    String portName = Serial.list()[0];
+    arduinoSerialPort = new Serial(this, portName, 9600);
+    println("Arduino Serial Port Found: " + portName);
+  } else {
+    println("No Arduino Serial Port Found");
+  }
+  
+  // Set up Kinect
   context = new SimpleOpenNI(this);
   if (context.isInit() == false) {
     println("Can't init SimpleOpenNI, maybe the camera is not connected!"); 
     exit();
     return;
   }
-
-  // enable depthMap generation 
+    // enable depthMap generation 
   context.enableDepth();
-
-  // enable skeleton generation for all joints.
+    // enable skeleton generation for all joints
   context.enableUser();
+  
+    // set up filteredSkeleton
+  skeletonIndexes = new int[] {
+    SimpleOpenNI.SKEL_HEAD,
+    SimpleOpenNI.SKEL_LEFT_ELBOW,
+    SimpleOpenNI.SKEL_LEFT_FINGERTIP,
+    SimpleOpenNI.SKEL_LEFT_FOOT,
+    SimpleOpenNI.SKEL_LEFT_HAND,
+    SimpleOpenNI.SKEL_LEFT_HIP,
+    SimpleOpenNI.SKEL_LEFT_KNEE,
+    SimpleOpenNI.SKEL_LEFT_SHOULDER,
+    SimpleOpenNI.SKEL_NECK,
+    SimpleOpenNI.SKEL_RIGHT_ELBOW,
+    SimpleOpenNI.SKEL_RIGHT_FINGERTIP,
+    SimpleOpenNI.SKEL_RIGHT_FOOT,
+    SimpleOpenNI.SKEL_RIGHT_HAND,
+    SimpleOpenNI.SKEL_RIGHT_HIP,
+    SimpleOpenNI.SKEL_RIGHT_KNEE,
+    SimpleOpenNI.SKEL_RIGHT_SHOULDER,
+    SimpleOpenNI.SKEL_TORSO
+  };
+  int maxSkeletonIndex = 0;
+  for (int i = 0; i < skeletonIndexes.length; i++) {
+    maxSkeletonIndex = max(maxSkeletonIndex, skeletonIndexes[i]);
+  }
+  filteredSkeleton = new PVector[maxSkeletonIndex + 1];
+  for (int i = 0; i < skeletonIndexes.length; i++) {
+    filteredSkeleton[skeletonIndexes[i]] = new PVector();
+  }
+
+  
+  // Set up Drawing Window
+  size(640, 480);
   background(200, 0, 0);
   stroke(0, 0, 255);
   strokeWeight(3);
   smooth();
 }
-  PVector oldRShoulder = new PVector();
-  PVector oldRElbow = new PVector();
-  PVector oldRHand = new PVector();
-  PVector oldRHip = new PVector();
-  PVector oldRKnee = new PVector();
-  PVector oldRFoot = new PVector();
-  PVector oldLShoulder = new PVector();
-  PVector oldLElbow = new PVector();
-  PVector oldLHand = new PVector();
-  PVector oldLHip = new PVector();
-  PVector oldLKnee = new PVector();
-  PVector oldLFoot = new PVector();  
-  PVector oldTorso = new PVector();
-  PVector oldNeck = new PVector();
   
-  PVector filteredRShoulder = new PVector();
-  PVector filteredRElbow = new PVector();
-  PVector filteredRHand = new PVector();
-  PVector filteredRHip = new PVector();
-  PVector filteredRKnee = new PVector();
-  PVector filteredRFoot = new PVector();
-  PVector filteredLShoulder = new PVector();
-  PVector filteredLElbow = new PVector();
-  PVector filteredLHand = new PVector();
-  PVector filteredLHip = new PVector();
-  PVector filteredLKnee = new PVector();
-  PVector filteredLFoot = new PVector();  
-  PVector filteredTorso = new PVector();
-  PVector filteredNeck = new PVector();
-  
+/********** draw() **********/
 void draw() {
-  // update the cam
+  // Draw Kinect Data
+    // update the cam
   context.update();
-  // draw depthImageMap
+    // draw depthImageMap
   image(context.depthImage(), 0, 0);
   image(context.userImage(), 0, 0);  
-  // draw the skeleton if it's available
+    // draw the skeleton if it's available
   int[] userList = context.getUsers();
   for (int i=0;i<userList.length;i++) {
     if (context.isTrackingSkeleton(userList[i])) {
@@ -99,106 +125,59 @@ void draw() {
       text(Integer.toString(userList[i]), com2d.x, com2d.y);
     }
   }
-  
-  /* output joint angles. */
-  if (userList.length > 0) {
-    if (context.isTrackingSkeleton(userList[0])) {
-      // output, right now only send values by the 100
-      PVector rElbow = new PVector();
-      PVector rShoulder = new PVector();
-      PVector rHand = new PVector();
-      PVector rHip = new PVector();
-      PVector rKnee = new PVector();
-      PVector rFoot = new PVector();
-      PVector lElbow = new PVector();
-      PVector lShoulder = new PVector();
-      PVector lHand = new PVector();
-      PVector lHip = new PVector();
-      PVector lKnee = new PVector();
-      PVector lFoot = new PVector();
-      PVector torso = new PVector();
-      PVector neck = new PVector();
-      int userId = userList[0];
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, rElbow);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, rShoulder);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_HAND, rHand);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_HIP, rHip);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, rKnee);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_FOOT, rFoot);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, lElbow);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, lShoulder);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_HAND, lHand);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_HIP, lHip);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_KNEE, lKnee);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_LEFT_FOOT, lFoot);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_TORSO, torso);
-      context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_NECK, neck);
-      
-      float alpha = 0.99;
-      float beta = 1 - alpha;
-      filteredRShoulder = new PVector(alpha * oldRShoulder.x + beta * rShoulder.x,
-                           alpha * oldRShoulder.y + beta * rShoulder.y, 
-                           alpha * oldRShoulder.z + beta * rShoulder.z);
-      filteredRElbow = new PVector(alpha * oldRElbow.x + beta * rElbow.x,
-                           alpha * oldRElbow.y + beta * rElbow.y, 
-                           alpha * oldRElbow.z + beta * rElbow.z);
-      filteredRHand = new PVector(alpha * oldRHand.x + beta * rHand.x,
-                           alpha * oldRHand.y + beta * rHand.y, 
-                           alpha * oldRHand.z + beta * rHand.z);
- 
-      oldRShoulder = rShoulder;
-      oldRElbow = rElbow;
-      oldRHand = rHand;
-      float shoulderAng = shoulderFromDotProduct(filteredRElbow, filteredRShoulder, filteredRHand);
-      float shoulderFlapAng = shoulderFlapFromDotProduct(filteredRElbow, filteredRShoulder);
-      float elbowAng = elbowFromDotProduct(filteredRElbow, filteredRShoulder, filteredRHand);
-     // println("shoulderAng " + shoulderAng);
-     // println("shoulderFlapAng " + shoulderFlapAng);
-      println(toAx12Old(shoulderAng));
-      println(toAx12Old(shoulderFlapAng));
-      println(toAx12Old(elbowAng));
-      myPort.write(toAx12Old(shoulderAng));
-      myPort.write(toAx12Old(shoulderFlapAng));
-      myPort.write(toAx12Old(elbowAng));
-      //println(toAx12(shoulderAng));
-      //myPort.write(toAx12(filteredShoulderFlap));
-    //  println(toAx12(filteredShoulderFlap));
-      myPort.write('\n');
-      //delay(100);
-    }
+
+  // Perform update if possible
+  if (!(userList.length > 0)) {
+    return;
+  }
+  if (!context.isTrackingSkeleton(userList[0])) {
+    return;
+  }
+  update();
+}
+
+/********** update() **********/
+// Check (userList.length > 0 && context.isTrackingSkeleton(userList[0])) before calling 
+void update() {
+  updateFilteredData();
+
+  float shoulderAng = shoulderFromDotProduct(filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND]);
+  float shoulderFlapAng = shoulderFlapFromDotProduct(filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER]);
+  float elbowAng = elbowFromDotProduct(filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND]);
+
+  println(toAx12Old(shoulderAng));
+  println(toAx12Old(shoulderFlapAng));
+  println(toAx12Old(elbowAng));
+  println("\n");
+
+  if (isArduinoConnected) {
+    arduinoSerialPort.write(toAx12Old(shoulderAng));
+    arduinoSerialPort.write(toAx12Old(shoulderFlapAng));
+    arduinoSerialPort.write(toAx12Old(elbowAng));
+    arduinoSerialPort.write('\n');
   }
 }
+
+/********** updateFilteredData() **********/
+void updateFilteredData() {
+  int[] userList = context.getUsers();
+  int userId = userList[0];
+  
+  for (int i = 0; i < skeletonIndexes.length; i++) {
+    PVector joint = new PVector();
+    int jointIndex = skeletonIndexes[i];
+    context.getJointPositionSkeleton(userId, jointIndex, joint);
+    filteredSkeleton[jointIndex] = new PVector(
+      lowPassAlpha * filteredSkeleton[jointIndex].x + lowPassBeta * joint.x,
+      lowPassAlpha * filteredSkeleton[jointIndex].y + lowPassBeta * joint.y,
+      lowPassAlpha * filteredSkeleton[jointIndex].z + lowPassBeta * joint.z
+    );
+  }
+}
+
 /** Helper to convert angle into Ax12 input. */
 int toAx12Old(float inp) {
   return ((int) (200 + inp / (3.14/2) * 300) / 10);
-}
-int toAx12(float inp) {
-  return ((int) (inp/3.14 * 600) + 200);
-}
-// draw the skeleton with the selected joints
-void drawSkeleton(int userId) {
-  print("user id ");
-  println(userId );
-  /* Angle Calculation. */
-  context.drawLimb(userId, SimpleOpenNI.SKEL_HEAD, SimpleOpenNI.SKEL_NECK);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_LEFT_SHOULDER);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_LEFT_ELBOW);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, SimpleOpenNI.SKEL_LEFT_HAND);
-
-  context.drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_RIGHT_SHOULDER);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_RIGHT_ELBOW);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, SimpleOpenNI.SKEL_RIGHT_HAND);
-
-  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
-
-  context.drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_LEFT_HIP);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_HIP, SimpleOpenNI.SKEL_LEFT_KNEE);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_KNEE, SimpleOpenNI.SKEL_LEFT_FOOT);
-
-  context.drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_RIGHT_HIP);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_HIP, SimpleOpenNI.SKEL_RIGHT_KNEE);
-  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);
 }
 
 /* Helper to calculate angle between 2 vectors. */
@@ -209,99 +188,7 @@ float angle(PVector a, PVector b, PVector c) {
   return ang;
 }
 
-// -----------------------------------------------------------------
-// SimpleOpenNI events
-
-void onNewUser(SimpleOpenNI curContext, int userId) {
-  println("onNewUser - userId: " + userId);
-  println("\tstart tracking skeleton");
-  curContext.startTrackingSkeleton(userId);
-}
-
-void onLostUser(SimpleOpenNI curContext, int userId) {
-  println("onLostUser - userId: " + userId);
-}
-
-void onVisibleUser(SimpleOpenNI curContext, int userId) {
-  //println("onVisibleUser - userId: " + userId);
-}
-
-void keyPressed() {
-  switch(key) {
-  case ' ':
-    context.setMirror(!context.mirror());
-    break;
-  }
-}
-
-//Shoulder YZ Plane Angle
-float shoulderAngle(PVector elbowVec, PVector shoulderVec) {
-  int[] elbow = {(int) elbowVec.x, (int) elbowVec.y, (int) elbowVec.z};
-  int[] shoulder = {(int) shoulderVec.x, (int) shoulderVec.y, (int) shoulderVec.z};
-  int rightArmY = shoulder[1] - elbow[1];
-  int rightArmZ = shoulder[2] - elbow[2];
-  float rightShoulderAngle = atan2(rightArmZ, rightArmY);
-  //println("Shoulder " + rightShoulderAngle);
-  return rightShoulderAngle;
-}
-
-//Shoulder XY Plane Angle
-float shoulderFlapAngle(int userId) {
-  PVector elbowVec = new PVector();
-  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, elbowVec);
-  PVector shoulderVec = new PVector();
-  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, shoulderVec);
-  int[] elbow = {(int)elbowVec.x, (int)elbowVec.y, (int)elbowVec.z};
-  int[] shoulder = {(int)shoulderVec.x, (int)shoulderVec.y, (int)shoulderVec.z};
-  int rightArmY = shoulder[1] - elbow[1];
-  int rightArmX = shoulder[0] - elbow[0];
-  float rightShoulderAngle = atan2(rightArmX, rightArmY);
-  //println("Shoulder Flap " + rightShoulderAngle);
-  return rightShoulderAngle + (3.14/2);
-}
-
-float flapDotProduct(int userId) {
-  PVector elbowVec = new PVector();
-  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, elbowVec);
-  PVector shoulderVec = new PVector();
-  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, shoulderVec);
-  PVector hipVec = new PVector();
-  context.getJointPositionSkeleton(userId,  SimpleOpenNI.SKEL_RIGHT_HIP, hipVec);
-  float[] elbow = {elbowVec.x, elbowVec.y, elbowVec.z};
-  float[] shoulder = {shoulderVec.x, shoulderVec.y, shoulderVec.z};
-  float[] hip = {hipVec.x, hipVec.y, hipVec.z};
-  float[] rightArm = {shoulder[0] - elbow[0], shoulder[1] - elbow[1]};
-  float[] side = {shoulder[0] - hip[0], shoulder[1] - hip[1]};
-  float armMag = sqrt(((int)rightArm[0])^2 + ((int)rightArm[1])^2);
-  float sideMag = sqrt(((int)side[0])^2 + ((int)side[1])^2);
-  rightArm[0] = rightArm[0]/armMag;
-  rightArm[1] = rightArm[1]/armMag;
-  side[0] = side[0]/sideMag;
-  side[1] = side[1]/sideMag;
-  float dot = (rightArm[0] * side[0]) + (rightArm[1] * side[1]);
-  float angle = acos(dot);
-  println(dot);
-  return dot;
- 
-}
-//Elbow YZ Plane
-float elbowAngle(int userId) {
-  PVector handVec = new PVector();
-  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_HAND, handVec);
-  PVector elbowVec = new PVector();
-  context.getJointPositionSkeleton(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, elbowVec);
-  int[] elbow = {(int)elbowVec.x, (int)elbowVec.y, (int)elbowVec.z};
-  int[] hand = {(int)handVec.x, (int)handVec.y, (int)handVec.z};
-  int rightArmY = elbow[1] - hand[1];
-  int rightArmZ = elbow[2] - hand[2];
-  float rightElbowAngle = atan2(rightArmZ, rightArmY);
-  //println("Elbow " + rightElbowAngle);
-  return rightElbowAngle;
-}
-
 float shoulderFromDotProduct(PVector elbow, PVector shoulder, PVector hand) {
-  
- 
   PVector arm = new PVector(0, elbow.y-shoulder.y, elbow.z-shoulder.z);
   PVector side = new PVector(0, 0, 1);
   // find projection
@@ -322,7 +209,7 @@ float shoulderFromDotProduct(PVector elbow, PVector shoulder, PVector hand) {
    }
  } else {
   return ang;
-}
+ }
 }
 
 float thresh = 150;
@@ -352,3 +239,54 @@ float elbowFromDotProduct(PVector elbow, PVector shoulder, PVector hand) {
   
   return (3.14-ang);
 }
+
+/********** drawSkeleton() **********/
+// draw the skeleton with the selected joints
+void drawSkeleton(int userId) {
+  // Angle Calculation
+  context.drawLimb(userId, SimpleOpenNI.SKEL_HEAD, SimpleOpenNI.SKEL_NECK);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_LEFT_SHOULDER);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_LEFT_ELBOW);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, SimpleOpenNI.SKEL_LEFT_HAND);
+
+  context.drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_RIGHT_SHOULDER);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_RIGHT_ELBOW);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, SimpleOpenNI.SKEL_RIGHT_HAND);
+
+  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+
+  context.drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_LEFT_HIP);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_HIP, SimpleOpenNI.SKEL_LEFT_KNEE);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_KNEE, SimpleOpenNI.SKEL_LEFT_FOOT);
+
+  context.drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_RIGHT_HIP);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_HIP, SimpleOpenNI.SKEL_RIGHT_KNEE);
+  context.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);
+}
+
+/********** keyPressed() **********/
+void keyPressed() {
+  switch(key) {
+  case ' ':
+    context.setMirror(!context.mirror());
+    break;
+  }
+}
+
+/********** SimpleOpenNI events **********/
+
+void onNewUser(SimpleOpenNI curContext, int userId) {
+  println("onNewUser - userId: " + userId);
+  println("\tstart tracking skeleton");
+  curContext.startTrackingSkeleton(userId);
+}
+
+void onLostUser(SimpleOpenNI curContext, int userId) {
+  println("onLostUser - userId: " + userId);
+}
+
+void onVisibleUser(SimpleOpenNI curContext, int userId) {
+  //println("onVisibleUser - userId: " + userId);
+}
+
