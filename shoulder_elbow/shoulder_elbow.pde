@@ -7,9 +7,9 @@
 
 import SimpleOpenNI.*;
 import processing.serial.*;
-Serial myPort;
-SimpleOpenNI  context;
-color[]       userClr = new color[] { 
+
+/********** Drawing Window **********/
+final color[] userClr = new color[] { 
   color(255, 0, 0), 
   color(0, 200, 200), 
   color(0, 0, 255), 
@@ -17,36 +17,58 @@ color[]       userClr = new color[] {
   color(255, 0, 255), 
   color(0, 255, 255)
 };
+
+/********** Kinect **********/
+SimpleOpenNI  context;
+
+/********** Arduino **********/
+// Assumed to be the first Serial port in Serial.list()
+boolean isArduinoConnected;
+Serial arduinoSerialPort;
+
 PVector com = new PVector();                                   
 PVector com2d = new PVector();                                   
 
+float oldShoulder = 0;
+float oldShoulderFlap = 0;
+float oldElbow = 0;
+float filteredShoulder = 0;
+float filteredShoulderFlap = 0;
+float filteredElbow = 0;
+
+/********** setup() **********/
 void setup() {
-  size(640, 480);
-  String portName = Serial.list()[0];
-  myPort = new Serial(this, portName, 9600);
+  // Set up Arduino
+  isArduinoConnected = Serial.list().length > 0;
+  if (isArduinoConnected) {
+    String portName = Serial.list()[0];
+    arduinoSerialPort = new Serial(this, portName, 9600);
+    println("Arduino Serial Port Found: " + portName);
+  } else {
+    println("No Arduino Serial Port Found");
+  }
+
+  // Set up Kinect
   context = new SimpleOpenNI(this);
   if (context.isInit() == false) {
     println("Can't init SimpleOpenNI, maybe the camera is not connected!"); 
     exit();
     return;
   }
-
   // enable depthMap generation 
   context.enableDepth();
-
   // enable skeleton generation for all joints
   context.enableUser();
+
+  // Set up Drawing Window
+  size(640, 480);
   background(200, 0, 0);
   stroke(0, 0, 255);
   strokeWeight(3);
   smooth();
 }
-  float oldShoulder = 0;
-  float oldShoulderFlap = 0;
-  float oldElbow = 0;
-  float filteredShoulder = 0;
-  float filteredShoulderFlap = 0;
-  float filteredElbow = 0;
+
+/********** draw() **********/
 void draw() {
   // update the cam
   context.update();
@@ -95,12 +117,15 @@ void draw() {
       //println("shoulder flap " + filteredShoulderFlap);
       //println("elbow " + filteredElbow);
       //flapDotProduct(userList[0]);
-      myPort.write(toAx12(filteredShoulder));
       println(toAx12(filteredShoulder));
-      //myPort.write(toAx12(filteredShoulderFlap));
       println(toAx12(filteredShoulderFlap));
-      myPort.write('\n');
-      //delay(100);
+      
+      // Send to Arduino
+      if (isArduinoConnected) {
+        arduinoSerialPort.write(toAx12(filteredShoulder));
+        arduinoSerialPort.write(toAx12(filteredShoulderFlap));
+        arduinoSerialPort.write('\n');
+      }
     }
   }
 }
