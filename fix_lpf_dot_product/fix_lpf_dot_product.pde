@@ -20,6 +20,7 @@ final color[] userClr = new color[] {
 
 /********** Kinect **********/
 SimpleOpenNI  context;
+int trackedUserIndex = 0;
 int[] skeletonIndexes;
 PVector[] filteredSkeleton;
 final float lowPassAlpha = .99;
@@ -118,12 +119,15 @@ void draw() {
       context.convertRealWorldToProjective(com, com2d);
       stroke(100, 255, 0);
       strokeWeight(1);
-      beginShape(LINES);
-      vertex(com2d.x, com2d.y - 5);
-      vertex(com2d.x, com2d.y + 5);
-      vertex(com2d.x - 5, com2d.y);
-      vertex(com2d.x + 5, com2d.y);
-      endShape();
+      // Only draw the + for the tracked user.
+      if (i == trackedUserIndex) {
+        beginShape(LINES);
+        vertex(com2d.x, com2d.y - 5);
+        vertex(com2d.x, com2d.y + 5);
+        vertex(com2d.x - 5, com2d.y);
+        vertex(com2d.x + 5, com2d.y);
+        endShape();
+      }
       fill(0, 255, 100);
       text(Integer.toString(userList[i]), com2d.x, com2d.y);
     }
@@ -144,27 +148,35 @@ void draw() {
 void update() {
   updateFilteredData();
 
-  float shoulderAng = shoulderRotationAngle(true);
-  float shoulderFlapAng = shoulderFlapAngle(true);
-  float elbowAng = elbowBendAngle(true);
+  byte[] packet = generatePacket();
 
-  println(toAx12(shoulderAng, false));
-  println(toAx12(shoulderFlapAng, false));
-  println(toAx12(elbowAng, true));
-  println("\n");
+  // Print Packet
+  print("Packet Data: ");
+  for (int i = 0; i < packet.length - 1; i++) {
+    print((int) packet[i]);
+    print(" ");
+  }
+  print('\n');
+  
+  // Draw Packet
+  textSize(40);
+  int x = 10;
+  int y = 50;
+  for (int i = 0; i < packet.length - 1; i++) {
+    text(Integer.toString((int) packet[i]), x, y);
+    y += 50;
+  }
 
+  // Send Packet
   if (isArduinoConnected) {
-    arduinoSerialPort.write(toAx12(shoulderAng, false));
-    arduinoSerialPort.write(toAx12(shoulderFlapAng, false));
-    arduinoSerialPort.write(toAx12(elbowAng, true));
-    arduinoSerialPort.write('\n');
+    arduinoSerialPort.write(packet);
   }
 }
 
 /********** updateFilteredData() **********/
 void updateFilteredData() {
   int[] userList = context.getUsers();
-  int userId = userList[0];
+  int userId = userList[trackedUserIndex];
   
   for (int i = 0; i < skeletonIndexes.length; i++) {
     PVector joint = new PVector();
@@ -178,14 +190,26 @@ void updateFilteredData() {
   }
 }
 
+/********** generatePacket() **********/
+byte[] generatePacket() {
+  byte[] packet = new byte[4];
+  
+  int i = 0;
+  packet[i++] = toAx12(shoulderRotationAngle(true), false);
+  packet[i++] = toAx12(shoulderFlapAngle(true), false);
+  packet[i++] = toAx12(elbowBendAngle(true), true);
+  packet[i++] = '\n';
+  
+  return packet;
+}
 /********** toAx12() **********/
 // Maps angle (0 to PI) to Ax12 input (20 to 80)
 // if inverted is true, maps 0 to 80, and PI to 20
-int toAx12(float angle, boolean inverted) {
+byte toAx12(float angle, boolean inverted) {
   if (inverted) { 
-    return (int) (80 - 60 * angle / Math.PI);
+    return (byte) (80 - 60 * angle / Math.PI);
   } else {
-    return (int) (20 + 60 * angle / Math.PI);
+    return (byte) (20 + 60 * angle / Math.PI);
   }
 }
 
@@ -288,7 +312,13 @@ void keyPressed() {
   case ' ':
     context.setMirror(!context.mirror());
     break;
-  }
+  case 's':
+    int numUsers = context.getUsers().length;
+    trackedUserIndex = (trackedUserIndex + 1) % numUsers;
+    print("Switching user: new index is ");
+    println(trackedUserIndex);
+    break;
+  }    
 }
 
 /********** SimpleOpenNI events **********/
@@ -301,6 +331,12 @@ void onNewUser(SimpleOpenNI curContext, int userId) {
 
 void onLostUser(SimpleOpenNI curContext, int userId) {
   println("onLostUser - userId: " + userId);
+  int numUsers = context.getUsers().length;
+  if (trackedUserIndex >= numUsers) {
+    trackedUserIndex--;
+    print("Switching user: new index is ");
+    println(trackedUserIndex);
+  }
 }
 
 void onVisibleUser(SimpleOpenNI curContext, int userId) {
