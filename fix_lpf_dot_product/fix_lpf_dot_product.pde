@@ -24,7 +24,8 @@ int[] skeletonIndexes;
 PVector[] filteredSkeleton;
 final float lowPassAlpha = .99;
 final float lowPassBeta = 1 - lowPassAlpha;
-  
+final float vectorMagnitudeThreshold = 150;
+
 /********** Arduino **********/
 // Assumed to be the first Serial port in Serial.list()
 boolean isArduinoConnected;
@@ -35,6 +36,8 @@ PVector com2d = new PVector();
 
 /********** setup() **********/
 void setup() {
+  println(PVector.angleBetween(new PVector(1,1,0), new PVector(-2,0,0)));
+  println(PVector.angleBetween(new PVector(-2,0,0), new PVector(2,2,0)));
   // Set up Arduino
   isArduinoConnected = Serial.list().length > 0;
   if (isArduinoConnected) {
@@ -141,19 +144,19 @@ void draw() {
 void update() {
   updateFilteredData();
 
-  float shoulderAng = shoulderFromDotProduct(filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND]);
-  float shoulderFlapAng = shoulderFlapFromDotProduct(filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER]);
-  float elbowAng = elbowFromDotProduct(filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER], filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND]);
+  float shoulderAng = shoulderRotationAngle(true);
+  float shoulderFlapAng = shoulderFlapAngle(true);
+  float elbowAng = elbowBendAngle(true);
 
-  println(toAx12Old(shoulderAng));
-  println(toAx12Old(shoulderFlapAng));
-  println(toAx12Old(elbowAng));
+  println(toAx12(shoulderAng, false));
+  println(toAx12(shoulderFlapAng, false));
+  println(toAx12(elbowAng, true));
   println("\n");
 
   if (isArduinoConnected) {
-    arduinoSerialPort.write(toAx12Old(shoulderAng));
-    arduinoSerialPort.write(toAx12Old(shoulderFlapAng));
-    arduinoSerialPort.write(toAx12Old(elbowAng));
+    arduinoSerialPort.write(toAx12(shoulderAng, false));
+    arduinoSerialPort.write(toAx12(shoulderFlapAng, false));
+    arduinoSerialPort.write(toAx12(elbowAng, true));
     arduinoSerialPort.write('\n');
   }
 }
@@ -175,69 +178,83 @@ void updateFilteredData() {
   }
 }
 
-/** Helper to convert angle into Ax12 input. */
-int toAx12Old(float inp) {
-  return ((int) (200 + inp / (3.14/2) * 300) / 10);
-}
-
-/* Helper to calculate angle between 2 vectors. */
-float angle(PVector a, PVector b, PVector c) {
-  float angle01 = atan2(a.y - b.y, a.x - b.x);
-  float angle02 = atan2(b.y - c.y, b.x - c.x);
-  float ang = angle02 - angle01;
-  return ang;
-}
-
-float shoulderFromDotProduct(PVector elbow, PVector shoulder, PVector hand) {
-  PVector arm = new PVector(0, elbow.y-shoulder.y, elbow.z-shoulder.z);
-  PVector side = new PVector(0, 0, 1);
-  // find projection
-  float dp = arm.dot(side);
-  float ang = acos(dp / (arm.mag()*side.mag()));
-  //println("shoulderAng = " + ang);
-  
-  println("magnitude of bicep vector" + arm.mag());
-  float arm_mag = arm.mag();
- if (arm_mag < thresh) {
-   arm = new PVector(0, hand.y-shoulder.y, hand.z-shoulder.z);
-   float arm_hand_mag = arm.mag();
-   if (arm_hand_mag < thresh) {
-     return (3.14/2);
-   } else {
-     ang = vec2angle(arm, side);
-     return ang;
-   }
- } else {
-  return ang;
- }
-}
-
-float thresh = 150;
-float vec2angle(PVector v, PVector ref) {
-  float dp = v.dot(ref);
-  float ang = acos(dp/(v.mag()*ref.mag()));
-  return ang;
-}
-
-float shoulderFlapFromDotProduct(PVector elbow, PVector shoulder) {
-  PVector arm = new PVector(elbow.x-shoulder.x, elbow.y-shoulder.y, 0);
-  PVector ref = new PVector(0, 1, 0);
-  float ang = vec2angle(arm, ref);
-  //println("shoulder flap ang = " + ang);
-  float arm_mag = arm.mag();
-  if (arm_mag < thresh) {
-    return 3.14;
+/********** toAx12() **********/
+// Maps angle (0 to PI) to Ax12 input (20 to 80)
+// if inverted is true, maps 0 to 80, and PI to 20
+int toAx12(float angle, boolean inverted) {
+  if (inverted) { 
+    return (int) (80 - 60 * angle / Math.PI);
   } else {
-  return ang;
+    return (int) (20 + 60 * angle / Math.PI);
   }
 }
 
-float elbowFromDotProduct(PVector elbow, PVector shoulder, PVector hand) {
-  PVector forarm = new PVector(hand.x - elbow.x, hand.y - elbow.y, hand.z - elbow.z);
-  PVector bicep = new PVector(shoulder.x - elbow.x, shoulder.y - elbow.y, shoulder.z - elbow.z);
-  float ang = vec2angle(forarm, bicep);
+/********** project() **********/
+// If subtractFromV1 is false: returns the projection of v1 onto v2.
+// If subtractFromV1 is true: returns v1 - projection. This can be used to project onto a plane, where v2 is the normal of the plane.
+PVector project(PVector v1, PVector v2, boolean subtractFromV1) {
+  PVector projection = PVector.mult(v2, v1.dot(v2) / v2.mag() / v2.mag());
+  if (subtractFromV1) {
+    return PVector.sub(v1, projection);
+  } else {
+    return projection;
+  }
+}
+
+/********** shoulderRotationAngle() **********/
+// Angle between (0,0,1) and the proejction of the arm (shoulder, elbow/hand joints) onto the YZ plane.
+// Returns angle 0 to PI.
+float shoulderRotationAngle(boolean rightSide) {
+  PVector elbow = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_ELBOW];
+  PVector shoulder = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_SHOULDER];
+  PVector hand = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_HAND];
+
+  PVector armYZ = project(PVector.sub(elbow, shoulder), new PVector(1, 0, 0), true);
+  PVector rotationAngle0 = new PVector(0, 0, 1);
   
-  return (3.14-ang);
+//  println("magnitude of bicep vector" + arm.mag());
+
+  if (armYZ.mag() < vectorMagnitudeThreshold) {
+    // If armYZ magnitude using elbow is too small, try using hand
+    armYZ = project(PVector.sub(hand, shoulder), new PVector(1, 0, 0), true);
+
+    if (armYZ.mag() < vectorMagnitudeThreshold) {
+      return (float) Math.PI / 2;
+    } else {
+      return PVector.angleBetween(armYZ, rotationAngle0);
+    }
+  } else {
+    return PVector.angleBetween(armYZ, rotationAngle0);
+  }
+}
+
+/********** shoulderFlapAngle() **********/
+// Angle between (0,1,0) and the projection of the arm (shoulder, elbow joints) onto the XY plane.
+// Returns angle 0 to PI.
+float shoulderFlapAngle(boolean rightSide) {
+  PVector elbow = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_ELBOW];
+  PVector shoulder = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_SHOULDER];
+
+  PVector armXY = project(PVector.sub(elbow, shoulder), new PVector(0, 0, 1), true);
+  PVector flapAngle0 = new PVector(0, 1, 0);
+  if (armXY.mag() < vectorMagnitudeThreshold) {
+    return (float) Math.PI;
+  } else {
+    return PVector.angleBetween(armXY, flapAngle0);
+  }
+}
+
+/********** elbowBendAngle() **********/
+// Angle between shoulder, elbow, and hand joints.
+// Returns angle 0 to PI.
+float elbowBendAngle(boolean rightSide) {
+  PVector elbow = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_ELBOW];
+  PVector shoulder = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_SHOULDER];
+  PVector hand = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_HAND];
+
+  PVector forarm = PVector.sub(hand, elbow);
+  PVector bicep = PVector.sub(shoulder, elbow);
+  return PVector.angleBetween(forarm, bicep);
 }
 
 /********** drawSkeleton() **********/
