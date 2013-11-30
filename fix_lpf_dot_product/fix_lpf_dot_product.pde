@@ -17,6 +17,8 @@ final color[] userClr = new color[] {
   color(255, 0, 255), 
   color(0, 255, 255)
 };
+PVector com = new PVector();
+PVector com2d = new PVector();
 
 /********** Kinect **********/
 SimpleOpenNI  context;
@@ -31,9 +33,6 @@ final float vectorMagnitudeThreshold = 150;
 // Assumed to be the first Serial port in Serial.list()
 boolean isArduinoConnected;
 Serial arduinoSerialPort;
-
-PVector com = new PVector();                                   
-PVector com2d = new PVector();                                   
 
 /********** setup() **********/
 void setup() {
@@ -117,7 +116,7 @@ void draw() {
     // draw the center of mass
     if (context.getCoM(userList[i], com)) {
       context.convertRealWorldToProjective(com, com2d);
-      stroke(100, 255, 0);
+      stroke(255, 255, 255);
       strokeWeight(1);
       // Only draw the + for the tracked user.
       if (i == trackedUserIndex) {
@@ -134,17 +133,19 @@ void draw() {
   }
 
   // Perform update if possible
-  if (!(userList.length > 0)) {
+  if (!(userList.length > trackedUserIndex)) {
+    println("trackedUserIndex exceeds number of users");
     return;
   }
-  if (!context.isTrackingSkeleton(userList[0])) {
+  if (!context.isTrackingSkeleton(userList[trackedUserIndex])) {
+    println("tracked user's skeleton not ready");
     return;
   }
   update();
 }
 
 /********** update() **********/
-// Check (userList.length > 0 && context.isTrackingSkeleton(userList[0])) before calling 
+// Check (userList.length > 0 && context.isTrackingSkeleton(userList[trackedUserIndex])) before calling 
 void update() {
   updateFilteredData();
 
