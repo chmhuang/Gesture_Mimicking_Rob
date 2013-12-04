@@ -7,6 +7,7 @@
 
 import SimpleOpenNI.*;
 import processing.serial.*;
+import fingertracker.*;
 
 /********** Drawing Window **********/
 final color[] userClr = new color[] { 
@@ -33,6 +34,12 @@ final float vectorMagnitudeThreshold = 150;
 // Assumed to be the first Serial port in Serial.list()
 boolean isArduinoConnected;
 Serial arduinoSerialPort;
+
+/******* FingerTracker *******/
+FingerTracker fingers;
+// default threshold about
+// should update threshold with wrist z
+int threshold = 625;
 
 /********** setup() **********/
 void setup() {
@@ -96,6 +103,11 @@ void setup() {
   stroke(0, 0, 255);
   strokeWeight(3);
   smooth();
+  
+  // for Fingers
+  // context.setMirror(true)
+  fingers = new FingerTracker(this, 640, 480);
+  fingers.setMeltFactor(90);
 }
   
 /********** draw() **********/
@@ -141,6 +153,27 @@ void draw() {
     println("tracked user's skeleton not ready");
     return;
   }
+  
+  // for fingers, set threshold
+  threshold = (int) filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND].z;
+  fingers.setThreshold(threshold);
+  int[] depthMap = context.depthMap();
+  fingers.update(depthMap);
+  stroke(0,255,0);
+  for (int k = 0; k < fingers.getNumContours(); k++) {
+    fingers.drawContour(k);
+  }
+  // iterate over all the fingers found
+  // and draw them as a red circle
+  noStroke();
+  fill(255,0,0);
+  for (int i = 0; i < fingers.getNumFingers(); i++) {
+    PVector position = fingers.getFinger(i);
+    ellipse(position.x - 5, position.y -5, 10, 10);
+  }
+  // show the threshold on the screen
+  fill(255,0,0);
+  text("threshold = " + threshold, 10, 20);
   update();
 }
 
