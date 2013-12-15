@@ -33,7 +33,7 @@ void setup() {
   //motor.writeInfo (ID, 5);
 }
 
-int[] servoValue = 
+
 void loop() {
   while(!Serial.available()) {
   }
