@@ -51,7 +51,7 @@ void setup() {
   isArduinoConnected = Serial.list().length > 0;
   if (isArduinoConnected) {
     String portName = Serial.list()[0];
-    arduinoSerialPort = new Serial(this, portName, 9600);
+    arduinoSerialPort = new Serial(this, portName, 57600);
     println("Arduino Serial Port Found: " + portName);
   } 
   else {
@@ -376,9 +376,9 @@ byte fingerGrab() {
     return (byte) 80;
   } 
   else if (numFingers <= 3) {
-    return (byte) 60;
+    return (byte) 50;
   }
-  return (byte) 60; // default to close hand
+  return (byte) 50; // default to close hand
 } // end fingerGrab()
 
 float angle3(boolean rightSide) {

@@ -7,7 +7,7 @@ void setup() {
  
   motor = AX12();
 
-  Serial.begin (9600);  // inicializa el Serial a 115,2 Kb/s
+  Serial.begin (57600);  // inicializa el Serial a 115,2 Kb/s
   AX12::init (1000000);   // inicializa los AX12 a 1 Mb/s
 
   byte detect;          
@@ -33,12 +33,12 @@ void setup() {
   //motor.writeInfo (ID, 5);
 }
 
-int[] servoValue = 
+
 void loop() {
   while(!Serial.available()) {
   }
-  char packet[5];
-  Serial.readBytesUntil('\n', packet, 5);
+  char packet[6];
+  Serial.readBytesUntil('\n', packet, 6);
     motor.id = 1;
     char reading = packet[0];
     motor.setVel(150);
@@ -49,20 +49,26 @@ void loop() {
     motor.setVel(150);
     motor.setPos(reading * 10);
     
-    motor.id = 4;
+    motor.id = 3; 
     reading = packet[2];
     motor.setVel(150);
     motor.setPos(reading * 10);
-    
-    motor.id = 6;
+//    motor.setPos(500);
+
+    motor.id = 4;
     reading = packet[3];
     motor.setVel(150);
     motor.setPos(reading * 10);
     
+    motor.id = 6;
+    reading = packet[4];
+    motor.setVel(250);
+    motor.setPos(reading * 10);
+    
     // set unused motor to 500
-    motor.id = 3;
-    motor.setVel(150);
-    motor.setPos(500);
+    //motor.id = 3;
+    //motor.setVel(150);
+    //motor.setPos(500);
     motor.id = 5;
     motor.setVel(150);
     motor.setPos(500);
@@ -124,5 +130,6 @@ void loop() {
     Serial.println (load, DEC);
     */    
     //delay (1100);
-  
+//   while (Serial.read() != -1) {
+//   }
 }
