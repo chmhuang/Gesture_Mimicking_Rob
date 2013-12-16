@@ -27,7 +27,7 @@ SimpleOpenNI  context;
 int trackedUserIndex = 0;
 int[] skeletonIndexes;
 PVector[] filteredSkeleton;
-final float lowPassAlpha = .95;
+final float lowPassAlpha = .9;
 final float lowPassBeta = 1 - lowPassAlpha;
 final float vectorMagnitudeThreshold = 150;
 
@@ -260,11 +260,12 @@ void updateFilteredData() {
 
 /********** generatePacket() **********/
 byte[] generatePacket() {
-  byte[] packet = new byte[5];
+  byte[] packet = new byte[6];
 
   int i = 0;
   packet[i++] = toAx12(shoulderRotationAngle(true), false);
   packet[i++] = toAx12(shoulderFlapAngle(true), false);
+  packet[i++] = toAx12(angle3(true), true);
   packet[i++] = toAx12(elbowBendAngle(true), true);
   packet[i++] = fingerGrab();
 
@@ -277,9 +278,15 @@ byte[] generatePacket() {
 // if inverted is true, maps 0 to 80, and PI to 20
 byte toAx12(float angle, boolean inverted) {
   if (inverted) { 
+    if (angle > Math.PI) {
+      angle = (float)Math.PI;
+    }
     return (byte) (80 - 60 * angle / Math.PI);
   } 
   else {
+     if (angle > Math.PI) {
+      angle = (float) Math.PI;
+    }
     return (byte) (20 + 60 * angle / Math.PI);
   }
 }
@@ -369,12 +376,12 @@ byte fingerGrab() {
     return (byte) 80;
   } 
   else if (numFingers <= 3) {
-    return (byte) 40;
+    return (byte) 60;
   }
-  return (byte) 40; // default to close hand
+  return (byte) 60; // default to close hand
 } // end fingerGrab()
 
-float angle4(boolean rightSide) {
+float angle3(boolean rightSide) {
   // a is forarm vector
   // b is bicep vector/upper arm vector
   PVector a = new PVector();
@@ -388,15 +395,14 @@ float angle4(boolean rightSide) {
   PVector bicep = PVector.sub(shoulder, elbow);
   a = forarm;
   b = bicep;
-  /*
+  
   float n = a.dot(b) / b.dot(b);
-  PVector rSide = b.mult(n);
-  c = a.sub(rSide);
+  PVector rSide = PVector.mult(b, n);
+  c = PVector.sub(a, rSide);
   float angle1 = shoulderRotationAngle(true);
   PVector p = new PVector(0, -sin(angle1), cos(angle1));
-  return acos((p.dot(c)) / (p.mag() * c.mag()));
-  */
-  return 1.0;
+  return ((acos((p.dot(c)) / (p.mag() * c.mag()))) * -1) + ((float) Math.PI/2); // for some reason formula is inverted that's why we need to *-1 + pi/2
+  
 }
 /********** drawSkeleton() **********/
 // draw the skeleton with the selected joints
