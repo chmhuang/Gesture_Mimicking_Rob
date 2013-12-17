@@ -299,7 +299,7 @@ void updateFilteredData() {
 
 /********** generatePacket() **********/
 byte[] generatePacket() {
-  byte[] packet = new byte[6];
+  byte[] packet = new byte[10];
 
   int i = 0;
   packet[i++] = toAx12(shoulderRotationAngle(true), false);
@@ -308,6 +308,13 @@ byte[] generatePacket() {
   packet[i++] = toAx12(elbowBendAngle(true), true);
   packet[i++] = fingerGrab(true);
 
+  // packets for left side
+  packet[i++] = toAx12(shoulderRotationAngle(false), false);
+  packet[i++] = toAx12(shoulderFlapAngle(false), false);
+  packet[i++] = toAx12(angle3(false), true);
+  packet[i++] = toAx12(elbowBendAngle(false), true);
+  packet[i++] = fingerGrab(false);
+  
   packet[i++] = '\n'; // end of packet
 
   return packet;
