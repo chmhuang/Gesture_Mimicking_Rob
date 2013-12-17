@@ -27,7 +27,7 @@ SimpleOpenNI  context;
 int trackedUserIndex = 0;
 int[] skeletonIndexes;
 PVector[] filteredSkeleton;
-final float lowPassAlpha = .95;
+final float lowPassAlpha = .9;
 final float lowPassBeta = 1 - lowPassAlpha;
 final float vectorMagnitudeThreshold = 150;
 
@@ -37,12 +37,16 @@ boolean isArduinoConnected;
 Serial arduinoSerialPort;
 
 /******* FingerTracker *******/
-FingerTracker fingers;
+FingerTracker rFingers;
+FingerTracker lFingers;
 // default threshold about 625 mm from kinect
 // should update threshold with wrist z
-int threshold = 625;
-int numFingersRight = 0;
-float filteredNumFingersRight = 0;
+int rThreshold = 625;
+int lThreshold = 625;
+int rNumFingers = 0;
+int lNumFingers = 0;
+float filteredRNumFingers = 0;
+float filteredLNumFingers = 0;
 /********** setup() **********/
 void setup() {
   println(PVector.angleBetween(new PVector(1, 1, 0), new PVector(-2, 0, 0)));
@@ -109,8 +113,10 @@ void setup() {
 
   // for Fingers
   // context.setMirror(true)
-  fingers = new FingerTracker(this, 640, 480); // need to change this size if window size changes
-  fingers.setMeltFactor(90); // melt factor is for green contour
+  rFingers = new FingerTracker(this, 640, 480); // need to change this size if window size changes
+  rFingers.setMeltFactor(90); // melt factor is for green contour
+  lFingers = new FingerTracker(this, 640, 480);
+  lFingers.setMeltFactor(90);
 } // end setup()
 
 /********** draw() **********/
@@ -148,9 +154,6 @@ void draw() {
   }
 
   // Perform update if possible
-  if (userList.length == 0) {
-    println("no tracked users");
-  }
   if (!(userList.length > trackedUserIndex)) {
     println("trackedUserIndex exceeds number of users");
     return;
@@ -169,14 +172,27 @@ void draw() {
   int jointIndexHand = skeletonIndexes[12]; // for hand, hand is for prcessing background points later
   context.getJointPositionSkeleton(uId, jointIndex, rFinTipVector);
   context.getJointPositionSkeleton(uId, jointIndexHand, rHandVector);  
-  threshold = (int) rFinTipVector.z;
-  fingers.setThreshold(threshold);
+  rThreshold = (int) rFinTipVector.z;
+  rFingers.setThreshold(rThreshold);
   int[] depthMap = context.depthMap();
-  fingers.update(depthMap);
+  rFingers.update(depthMap);
   stroke(0, 255, 0);
-  for (int k = 0; k < fingers.getNumContours(); k++) {
-    fingers.drawContour(k);
-  }
+  
+  // for left fingers 
+  uList = context.getUsers();
+  uId = uList[trackedUserIndex];
+  PVector lFinTipVector = new PVector(); // for setting finger tracker threshold
+  PVector lHandVector = new PVector();
+  jointIndex = skeletonIndexes[2]; // should be hard-coded to fingertip
+  jointIndexHand = skeletonIndexes[4]; // for hand, hand is for prcessing background points later
+  context.getJointPositionSkeleton(uId, jointIndex, lFinTipVector);
+  context.getJointPositionSkeleton(uId, jointIndexHand, lHandVector);  
+  lThreshold = (int) lFinTipVector.z;
+  lFingers.setThreshold(lThreshold);
+  depthMap = context.depthMap();
+  lFingers.update(depthMap);
+  stroke(0, 255, 0);
+  
   // iterate over all the fingers found
   // and draw them as a red circles
   // Finger coordinate x and y is relative to screen, not kinect. also needs to do position -5
@@ -187,10 +203,10 @@ void draw() {
   int y = 100;
   // threshold 
   int handThreshold = 100; // how far the finger points have to be away from hand
-  numFingersRight = 0;
-  int count = 0;
-  for (int i = 0; i < fingers.getNumFingers(); i++) {
-    PVector position = fingers.getFinger(i);
+  rNumFingers = 0;
+  int rCount = 0;
+  for (int i = 0; i < rFingers.getNumFingers(); i++) {
+    PVector position = rFingers.getFinger(i);
     PVector fingerI = new PVector(position.x-5, position.y-5);
     PVector rHandProjective = new PVector();
     context.convertRealWorldToProjective(rHandVector, rHandProjective);
@@ -202,13 +218,32 @@ void draw() {
     //text(Integer.toString((int)fingerI.dist(rh2d)), x, y);
     y+=60;
     if (diff < handThreshold) {
-      count++;
+      rCount++;
       ellipse(position.x - 5, position.y -5, 10, 10);
     }
   }
-  numFingersRight = count;
-  filteredNumFingersRight = lowPassAlpha * filteredNumFingersRight + lowPassBeta * numFingersRight;
-  text("NumFingersR " + Float.toString(filteredNumFingersRight), 400, 100);
+  lNumFingers = 0;
+  int lCount = 0;
+  for (int i = 0; i < lFingers.getNumFingers(); i++) {
+    PVector position = lFingers.getFinger(i);
+    PVector fingerI = new PVector(position.x-5, position.y-5);
+    PVector lHandProjective = new PVector();
+    context.convertRealWorldToProjective(lHandVector, lHandProjective);
+    int diff = abs((int)(lHandProjective.x - fingerI.x)) + abs((int)(lHandProjective.y - fingerI.y));
+    if (diff < handThreshold) {
+      lCount++;
+      ellipse(position.x-5, position.y-5, 10, 10);
+    }
+  }
+  rNumFingers = rCount;
+  filteredRNumFingers = lowPassAlpha * filteredRNumFingers + lowPassBeta * rNumFingers;
+  
+  lNumFingers = lCount;
+  filteredLNumFingers = lowPassAlpha * filteredLNumFingers + lowPassBeta * lNumFingers;
+  text("rNumFingers " + Integer.toString(rNumFingers), 400, 100);
+  text("lNumFingers" + Integer.toString(lNumFingers), 400, 200);
+  
+  
   update();
 } // end draw()
 
@@ -235,7 +270,7 @@ void update() {
     y += 50;
   }
   y += 50;
-  text("threshold = " + threshold, x, y);
+  text("rThreshold = " + rThreshold, x, y);
 
 
   // Send Packet
@@ -270,7 +305,7 @@ byte[] generatePacket() {
   packet[i++] = toAx12(shoulderFlapAngle(true), false);
   packet[i++] = toAx12(angle3(true), true);
   packet[i++] = toAx12(elbowBendAngle(true), true);
-  packet[i++] = fingerGrab();
+  packet[i++] = fingerGrab(true);
 
   packet[i++] = '\n'; // end of packet
 
@@ -371,20 +406,20 @@ float elbowBendAngle(boolean rightSide) {
 } // end elbowBendAngle()
 
 /********** fingerGrab() *********/
-byte fingerGrab() {
+byte fingerGrab(boolean rightSide) {
   // see how many fingers currently and compared to previous value
   // needs to store old values because moving opened hand around will induce a lot of noise
-
-  if (filteredNumFingersRight > 2.5) {
+  int numFingers = rightSide ? rNumFingers : lNumFingers; 
+  if (numFingers > 2.5) {
     return (byte) 80;
   } 
-  else if (filteredNumFingersRight <= 2.5) {
+  else if (numFingers <= 2.5) {
     return (byte) 50;
   }
   return (byte) 50; // default to close hand
 } // end fingerGrab()
 
-/********** angle3() **********/
+/*********** angle3 ***************/
 float angle3(boolean rightSide) {
   // a is forarm vector
   // b is bicep vector/upper arm vector

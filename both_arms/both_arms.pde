@@ -45,8 +45,8 @@ int rThreshold = 625;
 int lThreshold = 625;
 int rNumFingers = 0;
 int lNumFingers = 0;
-int rPrevNumFingers = 0;
-int lPrevNumFingers = 0;
+float filteredRNumFingers = 0;
+float filteredLNumFingers = 0;
 /********** setup() **********/
 void setup() {
   println(PVector.angleBetween(new PVector(1, 1, 0), new PVector(-2, 0, 0)));
@@ -236,7 +236,10 @@ void draw() {
     }
   }
   rNumFingers = rCount;
+  filteredRNumFingers = lowPassAlpha * filteredRNumFingers + lowPassBeta * rNumFingers;
+  
   lNumFingers = lCount;
+  filteredLNumFingers = lowPassAlpha * filteredLNumFingers + lowPassBeta * lNumFingers;
   text("rNumFingers " + Integer.toString(rNumFingers), 400, 100);
   text("lNumFingers" + Integer.toString(lNumFingers), 400, 200);
   
@@ -407,10 +410,10 @@ byte fingerGrab(boolean rightSide) {
   // see how many fingers currently and compared to previous value
   // needs to store old values because moving opened hand around will induce a lot of noise
   int numFingers = rightSide ? rNumFingers : lNumFingers; 
-  if (numFingers > 3) {
+  if (numFingers > 2.5) {
     return (byte) 80;
   } 
-  else if (numFingers <= 3) {
+  else if (numFingers <= 2.5) {
     return (byte) 50;
   }
   return (byte) 50; // default to close hand
@@ -476,6 +479,7 @@ void keyPressed() {
     trackedUserIndex = (trackedUserIndex + 1) % numUsers;
     print("Switching user: new index is ");
     println(trackedUserIndex);
+    delay(1000);
     break;
   }
 }
