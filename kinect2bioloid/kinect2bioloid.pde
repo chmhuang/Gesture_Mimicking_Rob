@@ -27,7 +27,7 @@ SimpleOpenNI  context;
 int trackedUserIndex = 0;
 int[] skeletonIndexes;
 PVector[] filteredSkeleton;
-final float lowPassAlpha = .9;
+final float lowPassAlpha = .95;
 final float lowPassBeta = 1 - lowPassAlpha;
 final float vectorMagnitudeThreshold = 150;
 
@@ -41,8 +41,8 @@ FingerTracker fingers;
 // default threshold about 625 mm from kinect
 // should update threshold with wrist z
 int threshold = 625;
-int numFingers = 0;
-int prevNumFingers = 0;
+int numFingersRight = 0;
+float filteredNumFingersRight = 0;
 /********** setup() **********/
 void setup() {
   println(PVector.angleBetween(new PVector(1, 1, 0), new PVector(-2, 0, 0)));
@@ -148,6 +148,9 @@ void draw() {
   }
 
   // Perform update if possible
+  if (userList.length == 0) {
+    println("no tracked users");
+  }
   if (!(userList.length > trackedUserIndex)) {
     println("trackedUserIndex exceeds number of users");
     return;
@@ -184,7 +187,7 @@ void draw() {
   int y = 100;
   // threshold 
   int handThreshold = 100; // how far the finger points have to be away from hand
-  numFingers = 0;
+  numFingersRight = 0;
   int count = 0;
   for (int i = 0; i < fingers.getNumFingers(); i++) {
     PVector position = fingers.getFinger(i);
@@ -203,9 +206,9 @@ void draw() {
       ellipse(position.x - 5, position.y -5, 10, 10);
     }
   }
-  numFingers = count;
-  prevNumFingers = numFingers;
-  text("NumFingers " + Integer.toString(numFingers), 400, 100);
+  numFingersRight = count;
+  filteredNumFingersRight = lowPassAlpha * filteredNumFingersRight + lowPassBeta * numFingersRight;
+  text("NumFingersR " + Float.toString(filteredNumFingersRight), 400, 100);
   update();
 } // end draw()
 
@@ -372,15 +375,16 @@ byte fingerGrab() {
   // see how many fingers currently and compared to previous value
   // needs to store old values because moving opened hand around will induce a lot of noise
 
-  if (numFingers > 3) {
+  if (filteredNumFingersRight > 2.5) {
     return (byte) 80;
   } 
-  else if (numFingers <= 3) {
+  else if (filteredNumFingersRight <= 2.5) {
     return (byte) 50;
   }
   return (byte) 50; // default to close hand
 } // end fingerGrab()
 
+/********** angle3() **********/
 float angle3(boolean rightSide) {
   // a is forarm vector
   // b is bicep vector/upper arm vector
@@ -440,6 +444,7 @@ void keyPressed() {
     trackedUserIndex = (trackedUserIndex + 1) % numUsers;
     print("Switching user: new index is ");
     println(trackedUserIndex);
+    delay(1000);
     break;
   }
 }
