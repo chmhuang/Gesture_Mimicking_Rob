@@ -35,8 +35,8 @@ final float vectorMagnitudeThreshold = 150;
 // Assumed to be the first Serial port in Serial.list()
 boolean isArduinoConnected;
 Serial arduinoSerialPort;
-final float maxAx12 = 40;
-final float minAx12 = 10;
+final float maxAx12 = 80;
+final float minAx12 = 20;
 
 /******* FingerTracker *******/
 FingerTracker rFingers;
@@ -299,13 +299,15 @@ void updateFilteredData() {
 
 /********** generatePacket() **********/
 byte[] generatePacket() {
+
   byte[] packet = new byte[10];
 
   int i = 0;
   packet[i++] = toAx12(shoulderRotationAngle(true), false);
   packet[i++] = toAx12(shoulderFlapAngle(true), false);
-  packet[i++] = toAx12(angle3(true), true);
+  packet[i++] = toAx12(elbowRotation(true), true);
   packet[i++] = toAx12(elbowBendAngle(true), true);
+  packet[i++] = (byte) (maxAx12 + minAx12) / 2;
   packet[i++] = fingerGrab(true);
 
   // packets for left side
@@ -428,8 +430,8 @@ byte fingerGrab(boolean rightSide) {
   return (byte) (maxAx12 + minAx12) / 2; // default to close hand
 } // end fingerGrab()
 
-/*********** angle3 ***************/
-float angle3(boolean rightSide) {
+/*********** elbowRotation ***************/
+float elbowRotation(boolean rightSide) {
   PVector elbow = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_ELBOW];
   PVector shoulder = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_SHOULDER];
   PVector hand = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_HAND];
