@@ -10,7 +10,7 @@ void setup() {
   Serial.begin (57600);  // inicializa el Serial a 115,2 Kb/s
   AX12::init (1000000);   // inicializa los AX12 a 1 Mb/s
 
-  byte detect;          
+  byte detect;
 //  byte num = AX12::autoDetect (&detect, 1); // detección de IDs
 
   //Serial.print (" deteccion: ");
@@ -39,97 +39,35 @@ void loop() {
   }
   char packet[6];
   Serial.readBytesUntil('\n', packet, 6);
-    motor.id = 1;
-    char reading = packet[0];
-    motor.setVel(150);
-    motor.setPos(reading * 10);
-    
-    motor.id = 2;
-    reading = packet[1];
-    motor.setVel(150);
-    motor.setPos(reading * 10);
-    
-    motor.id = 3; 
-    reading = packet[2];
-    motor.setVel(150);
-    motor.setPos(reading * 10);
-//    motor.setPos(500);
+  const int readingMultiplier = 20;
 
-    motor.id = 4;
-    reading = packet[3];
-    motor.setVel(150);
-    motor.setPos(reading * 10);
-    
-    motor.id = 6;
-    reading = packet[4];
-    motor.setVel(250);
-    motor.setPos(reading * 10);
-    
-    // set unused motor to 500
-    //motor.id = 3;
-    //motor.setVel(150);
-    //motor.setPos(500);
-    motor.id = 5;
-    motor.setVel(150);
-    motor.setPos(500);
-    
-    /*
-    motor.id = 2;
-    motor.setPos(800);
-    motor.id = 3; 
-    motor.setPos (500);
-    motor.id = 4; 
-    motor.setPos (500);
-    motor.id = 5; 
-    motor.setPos (500);
-    */
+  motor.id = 1;
+  char reading = packet[0];
+  motor.setVel(150);
+  motor.setPos(reading * readingMultiplier);
+  
+  motor.id = 2;
+  reading = packet[1];
+  motor.setVel(150);
+  motor.setPos(reading * readingMultiplier);
+  
+  motor.id = 3; 
+  reading = packet[2];
+  motor.setVel(150);
+  motor.setPos(reading * readingMultiplier);
 
-/*
-    if (Serial.available() > 0) {
-      int tmp = Serial.read() - 48;
-      if (tmp >= 0 && tmp <= 9) {
-        Serial.print("I received: ");
-        Serial.println(tmp);
-        if (tmp == 0&& false) {
-          mode = 0;
-          Serial.println("mode changed to 0 - id");
-        } else if (tmp == 9 && false) {
-          mode = 1;
-          Serial.println("mode changed to 1 - position");
-        } else {
-          if (mode == 0) {
-            id = 1;//0+tmp;
-            motor.id = id;
-            Serial.print("new id: ");
-            Serial.println(id);
-          } else {
-            p = tmp;
-            motor.setVel (300);//random (100, 300));
-            motor.setPos (p*100);//random (200, 800));
-            Serial.print("new position: ");
-            Serial.print(p*100);
-            Serial.print(" to id: ");
-            Serial.println(id);
-          }
-        }
-      }
-    }
-    
-     //5delay (100);
-    /*
-    int pos = motor.getPos(); 
-    int vel = motor.getSpeed(); 
-    int load = motor.getLoad();
-    
-    Serial.println (" ");
-    Serial.print (" posicion: ");
-    Serial.println (pos, DEC);
-    Serial.print (" velocidad: ");
-    Serial.println (vel, DEC);
-    Serial.print (" carga: ");
-    Serial.println (load, DEC);
-    */    
-    //delay (1100);
-//   while (Serial.read() != -1) {
-//   }
+  motor.id = 4;
+  reading = packet[3];
+  motor.setVel(150);
+  motor.setPos(reading  * readingMultiplier);
+  
+  motor.id = 6;
+  reading = packet[4];
+  motor.setVel(250);
+  motor.setPos(reading * readingMultiplier);
+  
+  // set unused motor to 500
+  motor.id = 5;
+  motor.setVel(150);
+  motor.setPos(500);
 }

@@ -27,7 +27,7 @@ SimpleOpenNI  context;
 int trackedUserIndex = 0;
 int[] skeletonIndexes;
 PVector[] filteredSkeleton;
-final float lowPassAlpha = .9;
+final float lowPassAlpha = .91;
 final float lowPassBeta = 1 - lowPassAlpha;
 final float vectorMagnitudeThreshold = 150;
 
@@ -35,6 +35,8 @@ final float vectorMagnitudeThreshold = 150;
 // Assumed to be the first Serial port in Serial.list()
 boolean isArduinoConnected;
 Serial arduinoSerialPort;
+final float maxAx12 = 40;
+final float minAx12 = 10;
 
 /******* FingerTracker *******/
 FingerTracker rFingers;
@@ -240,9 +242,8 @@ void draw() {
   
   lNumFingers = lCount;
   filteredLNumFingers = lowPassAlpha * filteredLNumFingers + lowPassBeta * lNumFingers;
-  text("rNumFingers " + Integer.toString(rNumFingers), 400, 100);
-  text("lNumFingers" + Integer.toString(lNumFingers), 400, 200);
-  
+  text("rNumFingers " + Float.toString(filteredRNumFingers), 350, 100);
+  text("lNumFingers" + Float.toString(filteredLNumFingers), 350, 200);
   
   update();
 } // end draw()
@@ -312,20 +313,20 @@ byte[] generatePacket() {
   return packet;
 }
 /********** toAx12() **********/
-// Maps angle (0 to PI) to Ax12 input (20 to 80)
+// Maps angle (0 to PI) to Ax12 input (minAx12 to maxAx12)
 // if inverted is true, maps 0 to 80, and PI to 20
 byte toAx12(float angle, boolean inverted) {
   if (inverted) { 
     if (angle > Math.PI) {
       angle = (float)Math.PI;
     }
-    return (byte) (80 - 60 * angle / Math.PI);
+    return (byte) (maxAx12 - (maxAx12 - minAx12) * angle / Math.PI);
   } 
   else {
      if (angle > Math.PI) {
       angle = (float) Math.PI;
     }
-    return (byte) (20 + 60 * angle / Math.PI);
+    return (byte) (minAx12 + (maxAx12 - minAx12) * angle / Math.PI);
   }
 }
 
@@ -409,38 +410,30 @@ float elbowBendAngle(boolean rightSide) {
 byte fingerGrab(boolean rightSide) {
   // see how many fingers currently and compared to previous value
   // needs to store old values because moving opened hand around will induce a lot of noise
-  int numFingers = rightSide ? rNumFingers : lNumFingers; 
-  if (numFingers > 2.5) {
-    return (byte) 80;
+  float filteredNumFingers = rightSide ? filteredRNumFingers : filteredLNumFingers; 
+  if (filteredNumFingers > 2.5) {
+    return (byte) maxAx12;
   } 
-  else if (numFingers <= 2.5) {
-    return (byte) 50;
+  else if (filteredNumFingers <= 2.5) {
+    return (byte) (maxAx12 + minAx12) / 2;
+
   }
-  return (byte) 50; // default to close hand
+  return (byte) (maxAx12 + minAx12) / 2; // default to close hand
 } // end fingerGrab()
 
 /*********** angle3 ***************/
 float angle3(boolean rightSide) {
-  // a is forarm vector
-  // b is bicep vector/upper arm vector
-  PVector a = new PVector();
-  PVector b = new PVector();
-  PVector c = new PVector();
   PVector elbow = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_ELBOW];
   PVector shoulder = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_SHOULDER];
   PVector hand = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_HAND];
 
-  PVector forarm = PVector.sub(hand, elbow);
+  PVector forearm = PVector.sub(hand, elbow);
   PVector bicep = PVector.sub(shoulder, elbow);
-  a = forarm;
-  b = bicep;
+  PVector forearmOnBicepPlane = project(forearm, bicep, true);
   
-  float n = a.dot(b) / b.dot(b);
-  PVector rSide = PVector.mult(b, n);
-  c = PVector.sub(a, rSide);
-  float angle1 = shoulderRotationAngle(true);
-  PVector p = new PVector(0, -sin(angle1), cos(angle1));
-  return ((acos((p.dot(c)) / (p.mag() * c.mag()))) * -1) + ((float) Math.PI/2); // for some reason formula is inverted that's why we need to *-1 + pi/2
+  float shoulderRotAngle = shoulderRotationAngle(rightSide);
+  PVector p = new PVector(0, -sin(shoulderRotAngle), cos(shoulderRotAngle));
+  return ((acos((p.dot(forearmOnBicepPlane)) / (p.mag() * forearmOnBicepPlane.mag()))) * -1) + ((float) Math.PI/2); // for some reason formula is inverted that's why we need to *-1 + pi/2
   
 }
 /********** drawSkeleton() **********/
