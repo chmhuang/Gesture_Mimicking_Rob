@@ -27,7 +27,7 @@ SimpleOpenNI  context;
 int trackedUserIndex = 0;
 int[] skeletonIndexes;
 PVector[] filteredSkeleton;
-final float lowPassAlpha = .91;
+final float lowPassAlpha = .90;
 final float lowPassBeta = 1 - lowPassAlpha;
 final float vectorMagnitudeThreshold = 150;
 
@@ -201,6 +201,7 @@ void draw() {
   noStroke();
   fill(255, 0, 0);
   // for debugging prints
+  textSize(30);
   int x = 400;
   int y = 100;
   // threshold 
@@ -212,7 +213,6 @@ void draw() {
     PVector fingerI = new PVector(position.x-5, position.y-5);
     PVector rHandProjective = new PVector();
     context.convertRealWorldToProjective(rHandVector, rHandProjective);
-    textSize(30);
     int diff = abs((int)(rHandProjective.x - fingerI.x)) + abs((int)(rHandProjective.y - fingerI.y)); // calculate diff manually instead of using dist() method
     //text("Diff " + Integer.toString(diff), x, y);
     //text(Integer.toString((int)rh2d.x) + ", " + Integer.toString((int)rh2d.y), x, y);
@@ -242,8 +242,8 @@ void draw() {
   
   lNumFingers = lCount;
   filteredLNumFingers = lowPassAlpha * filteredLNumFingers + lowPassBeta * lNumFingers;
-  text("rNumFingers " + Float.toString(filteredRNumFingers), 350, 100);
-  text("lNumFingers" + Float.toString(filteredLNumFingers), 350, 200);
+  text("rNumFingers " + Float.toString(filteredRNumFingers), 385, 100);
+  text("lNumFingers" + Float.toString(filteredLNumFingers), 385, 200);
   
   update();
 } // end draw()
@@ -254,24 +254,27 @@ void update() {
   updateFilteredData();
   byte[] packet = generatePacket();
 
-  // Print Packet
-  print("Packet Data: ");
-  for (int i = 0; i < packet.length - 1; i++) {
-    print((int) packet[i]);
-    print(" ");
-  }
-  print('\n');
+//  // Print Packet
+//  print("Packet Data: ");
+//  for (int i = 0; i < packet.length - 1; i++) {
+//    print((int) packet[i]);
+//    print(" ");
+//  }
+//  print('\n');
 
   // Draw Packet
-  textSize(40);
+  textSize(25);
   int x = 10;
   int y = 50;
   for (int i = 0; i < packet.length - 1; i++) {
+    if ( i == packet.length / 2) {
+      y += 20;
+    }
     text(Integer.toString((int) packet[i]), x, y);
-    y += 50;
+    y += 35;
   }
-  y += 50;
-  text("rThreshold = " + rThreshold, x, y);
+//  y += 35;
+//  text("rThreshold = " + rThreshold, x, y);
 
 
   // Send Packet
@@ -300,21 +303,22 @@ void updateFilteredData() {
 /********** generatePacket() **********/
 byte[] generatePacket() {
 
-  byte[] packet = new byte[10];
+  byte[] packet = new byte[13];
 
   int i = 0;
   packet[i++] = toAx12(shoulderRotationAngle(true), false);
   packet[i++] = toAx12(shoulderFlapAngle(true), false);
-  packet[i++] = toAx12(elbowRotation(true), true);
+  packet[i++] = toAx12(elbowRotationAngle(true), false);
   packet[i++] = toAx12(elbowBendAngle(true), true);
   packet[i++] = (byte) (maxAx12 + minAx12) / 2;
   packet[i++] = fingerGrab(true);
 
   // packets for left side
-  packet[i++] = toAx12(shoulderRotationAngle(false), false);
-  packet[i++] = toAx12(shoulderFlapAngle(false), false);
-  packet[i++] = toAx12(angle3(false), true);
-  packet[i++] = toAx12(elbowBendAngle(false), true);
+  packet[i++] = toAx12(shoulderRotationAngle(false), true);
+  packet[i++] = toAx12(shoulderFlapAngle(false), true);
+  packet[i++] = toAx12(elbowRotationAngle(false), true);
+  packet[i++] = toAx12(elbowBendAngle(false), false);
+  packet[i++] = (byte) (maxAx12 + minAx12) / 2;
   packet[i++] = fingerGrab(false);
   
   packet[i++] = '\n'; // end of packet
@@ -421,7 +425,7 @@ byte fingerGrab(boolean rightSide) {
   // needs to store old values because moving opened hand around will induce a lot of noise
   float filteredNumFingers = rightSide ? filteredRNumFingers : filteredLNumFingers; 
   if (filteredNumFingers > 2.5) {
-    return (byte) maxAx12;
+    return rightSide ? (byte) maxAx12 : (byte) minAx12; // inverted on left
   } 
   else if (filteredNumFingers <= 2.5) {
     return (byte) (maxAx12 + minAx12) / 2;
@@ -430,20 +434,22 @@ byte fingerGrab(boolean rightSide) {
   return (byte) (maxAx12 + minAx12) / 2; // default to close hand
 } // end fingerGrab()
 
-/*********** elbowRotation ***************/
-float elbowRotation(boolean rightSide) {
+/*********** elbowRotationAngle ***************/
+float elbowRotationAngle(boolean rightSide) {
   PVector elbow = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_ELBOW];
   PVector shoulder = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_SHOULDER];
   PVector hand = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_HAND] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_HAND];
 
   PVector forearm = PVector.sub(hand, elbow);
   PVector bicep = PVector.sub(shoulder, elbow);
-  PVector forearmOnBicepPlane = project(forearm, bicep, true);
+  PVector forearmOnBicepNormalPlane = project(forearm, bicep, true);
   
-  float shoulderRotAngle = shoulderRotationAngle(rightSide);
-  PVector p = new PVector(0, -sin(shoulderRotAngle), cos(shoulderRotAngle));
-  return ((acos((p.dot(forearmOnBicepPlane)) / (p.mag() * forearmOnBicepPlane.mag()))) * -1) + ((float) Math.PI/2); // for some reason formula is inverted that's why we need to *-1 + pi/2
-  
+  float sRot = shoulderRotationAngle(rightSide);
+  PVector elbowRotationAngle0 = new PVector(0, cos(sRot), -sin(sRot));
+//  float sFlap = shoulderFlapAngle(rightSide);
+//  PVector elbowRotationAngleHalf = new PVector(cos(sFlap), -sin(sRot)*sin(sFlap), -sin(sFlap)*cos(sRot));
+  return PVector.angleBetween(elbowRotationAngle0, forearmOnBicepNormalPlane) + (float) (Math.PI / 8); // offset seems to line up with reality nicely.
+
 }
 /********** drawSkeleton() **********/
 // draw the skeleton with the selected joints
