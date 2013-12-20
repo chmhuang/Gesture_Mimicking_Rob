@@ -357,7 +357,7 @@ PVector project(PVector v1, PVector v2, boolean subtractFromV1) {
 }
 
 /********** shoulderRotationAngle() **********/
-// Angle between (0,0,1) and the proejction of the arm (shoulder, elbow/hand joints) onto the YZ plane.
+// Angle between (0,0,1) and the projection of the arm (shoulder, elbow/hand joints) onto the YZ plane.
 // Returns angle 0 to PI.
 float shoulderRotationAngle(boolean rightSide) {
   PVector elbow = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_ELBOW];
@@ -366,8 +366,6 @@ float shoulderRotationAngle(boolean rightSide) {
 
   PVector armYZ = project(PVector.sub(elbow, shoulder), new PVector(1, 0, 0), true);
   PVector rotationAngle0 = new PVector(0, 0, 1);
-
-  //  println("magnitude of bicep vector" + arm.mag());
 
   if (armYZ.mag() < vectorMagnitudeThreshold) {
     // If armYZ magnitude using elbow is too small, try using hand
@@ -386,9 +384,8 @@ float shoulderRotationAngle(boolean rightSide) {
 }
 
 /********** shoulderFlapAngle() **********/
-// Angle between (0,1,0) and the projection of the arm (shoulder, elbow joints) onto the XY plane.
+// Angle between the arm (shoulder, elbow joints) and the reference angle based on shoulderRotationAngle.
 // Returns angle 0 to PI.
-// reference depends on motor 1 angle
 float shoulderFlapAngle(boolean rightSide) {
   PVector elbow = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_ELBOW];
   PVector shoulder = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_SHOULDER];
@@ -398,12 +395,6 @@ float shoulderFlapAngle(boolean rightSide) {
   PVector flapAngle0 = new PVector(0, sin(refAngle), -1 * cos(refAngle));
 
   return PVector.angleBetween(arm, flapAngle0);
-  /*
-  if (armXY.mag() < vectorMagnitudeThreshold) {
-   return (float) Math.PI;
-   } else {
-   return PVector.angleBetween(armXY, flapAngle0);
-   }*/
 }
 
 /********** elbowBendAngle() **********/
@@ -417,24 +408,22 @@ float elbowBendAngle(boolean rightSide) {
   PVector forarm = PVector.sub(hand, elbow);
   PVector bicep = PVector.sub(shoulder, elbow);
   return PVector.angleBetween(forarm, bicep);
-} // end elbowBendAngle()
+}
 
 /********** fingerGrab() *********/
+// Gives the value for the hand servo based on the number of fingers detected for that hand (after filtering).
+// Returns servo value betwen 20-80
 byte fingerGrab(boolean rightSide) {
-  // see how many fingers currently and compared to previous value
-  // needs to store old values because moving opened hand around will induce a lot of noise
   float filteredNumFingers = rightSide ? filteredRNumFingers : filteredLNumFingers; 
   if (filteredNumFingers > 2.5) {
     return rightSide ? (byte) maxAx12 : (byte) minAx12; // inverted on left
   } 
-  else if (filteredNumFingers <= 2.5) {
-    return (byte) (maxAx12 + minAx12) / 2;
-
-  }
-  return (byte) (maxAx12 + minAx12) / 2; // default to close hand
-} // end fingerGrab()
+  return rightSide ? (byte) 40 : (byte) 60; // default to close hand
+}
 
 /*********** elbowRotationAngle ***************/
+// Angle between the forearm projected onto the plane normal to the bicep and the reference angle based on shoulderRotationAngle.
+// Returns angle 0 to PI (+ some offset)
 float elbowRotationAngle(boolean rightSide) {
   PVector elbow = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_ELBOW] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_ELBOW];
   PVector shoulder = rightSide ? filteredSkeleton[SimpleOpenNI.SKEL_RIGHT_SHOULDER] : filteredSkeleton[SimpleOpenNI.SKEL_LEFT_SHOULDER];
@@ -446,11 +435,10 @@ float elbowRotationAngle(boolean rightSide) {
   
   float sRot = shoulderRotationAngle(rightSide);
   PVector elbowRotationAngle0 = new PVector(0, cos(sRot), -sin(sRot));
-//  float sFlap = shoulderFlapAngle(rightSide);
-//  PVector elbowRotationAngleHalf = new PVector(cos(sFlap), -sin(sRot)*sin(sFlap), -sin(sFlap)*cos(sRot));
   return PVector.angleBetween(elbowRotationAngle0, forearmOnBicepNormalPlane) + (float) (Math.PI / 8); // offset seems to line up with reality nicely.
 
 }
+
 /********** drawSkeleton() **********/
 // draw the skeleton with the selected joints
 void drawSkeleton(int userId) {
